@@ -2,6 +2,7 @@ import unittest
 
 from cronconv.convert import parse_quartz, parse_standard, to_quartz, to_standard
 from cronconv.errors import CronFormatError
+from cronconv.fields import QuartzDomSpecial, QuartzDowSpecial
 
 
 class ParseStandardTests(unittest.TestCase):
@@ -50,6 +51,28 @@ class ParseQuartzTests(unittest.TestCase):
     def test_year_omitted_by_default(self):
         quartz = parse_quartz("0 0 12 ? * MON")
         self.assertIsNone(quartz.year)
+
+    def test_dom_last_day(self):
+        quartz = parse_quartz("0 0 12 L * ?")
+        self.assertEqual(quartz.dom, QuartzDomSpecial(kind="last"))
+
+    def test_dom_last_weekday(self):
+        quartz = parse_quartz("0 0 12 LW * ?")
+        self.assertEqual(quartz.dom, QuartzDomSpecial(kind="last_weekday"))
+
+    def test_dom_nearest_weekday(self):
+        quartz = parse_quartz("0 0 12 15W * ?")
+        self.assertEqual(quartz.dom, QuartzDomSpecial(kind="weekday_of", day=15))
+
+    def test_dow_last_occurrence(self):
+        quartz = parse_quartz("0 0 12 ? * 6L")
+        self.assertEqual(quartz.dow, QuartzDowSpecial(kind="last_weekday_of_month", day=6))
+
+    def test_dow_nth_occurrence(self):
+        quartz = parse_quartz("0 0 12 ? * 6#3")
+        self.assertEqual(
+            quartz.dow, QuartzDowSpecial(kind="nth_weekday_of_month", day=6, nth=3)
+        )
 
 
 class ToQuartzTests(unittest.TestCase):
@@ -104,6 +127,24 @@ class ToStandardTests(unittest.TestCase):
 
     def test_year_present_lenient_dropped(self):
         quartz = parse_quartz("30 0 9 * * ? 2026", lenient=True)
+        self.assertEqual(to_standard(quartz, lenient=True), "0 9 * * *")
+
+    def test_dom_special_strict_raises(self):
+        quartz = parse_quartz("0 0 9 L * ?")
+        with self.assertRaises(CronFormatError):
+            to_standard(quartz)
+
+    def test_dom_special_lenient_dropped(self):
+        quartz = parse_quartz("0 0 9 L * ?")
+        self.assertEqual(to_standard(quartz, lenient=True), "0 9 * * *")
+
+    def test_dow_special_strict_raises(self):
+        quartz = parse_quartz("0 0 9 ? * 6#3")
+        with self.assertRaises(CronFormatError):
+            to_standard(quartz)
+
+    def test_dow_special_lenient_dropped(self):
+        quartz = parse_quartz("0 0 9 ? * 6#3")
         self.assertEqual(to_standard(quartz, lenient=True), "0 9 * * *")
 
 

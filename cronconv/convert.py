@@ -21,10 +21,20 @@ convention that it's a reasonable default guess but is still a lossy one.
 """
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from .errors import CronFormatError
-from .fields import DAY_NAMES, MONTH_NAMES, QUARTZ_DAY_NAMES, Term, parse_field, render_field
+from .fields import (
+    DAY_NAMES,
+    MONTH_NAMES,
+    QuartzDomSpecial,
+    QuartzDowSpecial,
+    Term,
+    parse_field,
+    parse_quartz_dom,
+    parse_quartz_dow,
+    render_field,
+)
 
 
 @dataclass
@@ -41,9 +51,9 @@ class QuartzCron:
     second: List[Term]
     minute: List[Term]
     hour: List[Term]
-    dom: Optional[List[Term]]  # None means the field was '?'
+    dom: Optional[Union[List[Term], QuartzDomSpecial]]  # None means the field was '?'
     month: List[Term]
-    dow: Optional[List[Term]]  # None means the field was '?'
+    dow: Optional[Union[List[Term], QuartzDowSpecial]]  # None means the field was '?'
     year: Optional[List[Term]]  # None means the field was omitted
 
 
@@ -99,9 +109,9 @@ def parse_quartz(expr: str, lenient: bool = False) -> QuartzCron:
     second = parse_field(second_s, 0, 59, strict=strict)
     minute = parse_field(minute_s, 0, 59, strict=strict)
     hour = parse_field(hour_s, 0, 23, strict=strict)
-    dom = None if dom_is_placeholder else parse_field(dom_s, 1, 31, strict=strict)
+    dom = None if dom_is_placeholder else parse_quartz_dom(dom_s, strict=strict)
     month = parse_field(month_s, 1, 12, names=MONTH_NAMES, strict=strict)
-    dow = None if dow_is_placeholder else parse_field(dow_s, 1, 7, names=QUARTZ_DAY_NAMES, strict=strict)
+    dow = None if dow_is_placeholder else parse_quartz_dow(dow_s, strict=strict)
     year = parse_field(year_s, 1970, 2099, strict=strict) if year_s is not None else None
 
     return QuartzCron(second, minute, hour, dom, month, dow, year)
@@ -154,8 +164,25 @@ def to_standard(quartz: QuartzCron, lenient: bool = False) -> str:
             "cannot convert: standard cron has no year field (pass --lenient to drop it)"
         )
 
-    dom_out = "*" if quartz.dom is None else render_field(quartz.dom)
-    dow_out = "*" if quartz.dow is None else render_field(_shift_terms(quartz.dow, -1))
+    if isinstance(quartz.dom, QuartzDomSpecial):
+        if strict:
+            raise CronFormatError(
+                f"cannot convert: day-of-month value '{quartz.dom.render()}' has no standard "
+                "cron equivalent (pass --lenient to drop it)"
+            )
+        dom_out = "*"
+    else:
+        dom_out = "*" if quartz.dom is None else render_field(quartz.dom)
+
+    if isinstance(quartz.dow, QuartzDowSpecial):
+        if strict:
+            raise CronFormatError(
+                f"cannot convert: day-of-week value '{quartz.dow.render()}' has no standard "
+                "cron equivalent (pass --lenient to drop it)"
+            )
+        dow_out = "*"
+    else:
+        dow_out = "*" if quartz.dow is None else render_field(_shift_terms(quartz.dow, -1))
 
     parts = [
         render_field(quartz.minute),

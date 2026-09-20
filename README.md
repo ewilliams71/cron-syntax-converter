@@ -45,7 +45,23 @@ $ python -m cronconv to-quartz --lenient "0 9 1 * 1"
 
 $ python -m cronconv to-standard --lenient "30 0 9 * * ? 2026"
 0 9 * * *
+
+$ python -m cronconv to-standard "0 0 9 L * ?"
+cronconv: cannot convert: day-of-month value 'L' has no standard cron equivalent
+(pass --lenient to drop it)
+
+$ python -m cronconv to-standard --lenient "0 0 9 L * ?"
+0 9 * * *
 ```
+
+Quartz's day-of-month and day-of-week fields also accept a handful of special
+values standard cron has no notion of: `L` (last day of month), `L-n` (n days
+before the last day), `LW` (last weekday of the month), `nW` (weekday nearest
+day n), `nL` (last occurrence of weekday n in the month), and `n#k` (the kth
+occurrence of weekday n in the month). These parse on `to-standard` input
+and, like seconds and year, have no standard cron equivalent: strict mode
+rejects them, `--lenient` drops them to `*`. Standard cron has nothing
+equivalent to convert *into* Quartz, so `to-quartz` never produces them.
 
 Or install it (`pip install -e .`) to get the `cronconv` command directly:
 
@@ -60,9 +76,9 @@ $ cronconv to-quartz "*/5 * * * *"
 - Accepts descending ranges (e.g. `22-2`) instead of rejecting them.
 - When converting to Quartz, if both day-of-month and day-of-week are
   restricted, keeps day-of-month and drops day-of-week instead of raising.
-- When converting to standard cron, drops a non-zero seconds field or a
-  year field instead of raising, since standard cron has nowhere to put
-  them.
+- When converting to standard cron, drops a non-zero seconds field, a
+  year field, or a Quartz `L`/`W`/`#` special value instead of raising,
+  since standard cron has nowhere to put them.
 
 Everything else still has to be a structurally valid cron field; `--lenient`
 widens a few specific, documented rules, not general error tolerance.
@@ -73,8 +89,9 @@ This first pass covers the field grammar that's common to both formats:
 `*`, single values, ranges, steps, comma lists, and month/day names. Names
 are accepted on input (`MON`, `JAN`, ...) but always normalized to numbers
 on output, since the two formats number weekdays differently and there's no
-lossless way to round-trip the name through that shift. It does not yet
-handle Quartz's `L`, `W`, or `#` special characters, or the
+lossless way to round-trip the name through that shift. Quartz's `L`, `W`,
+and `#` day-of-month/day-of-week special values are accepted on
+`to-standard` input (see above); it does not yet handle the
 `@daily`/`@hourly`-style shorthand some cron implementations support.
 
 ## License
