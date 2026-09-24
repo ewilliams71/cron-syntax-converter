@@ -52,7 +52,15 @@ cronconv: cannot convert: day-of-month value 'L' has no standard cron equivalent
 
 $ python -m cronconv to-standard --lenient "0 0 9 L * ?"
 0 9 * * *
+
+$ python -m cronconv to-quartz "@daily"
+0 0 0 * * ?
 ```
+
+Standard cron's `@yearly`/`@annually`, `@monthly`, `@weekly`, `@daily`/`@midnight`,
+and `@hourly` shorthands are accepted as input to `to-quartz` and expanded to
+their field equivalent before conversion; `@reboot` has no fixed schedule and
+is always rejected, lenient or not.
 
 Quartz's day-of-month and day-of-week fields also accept a handful of special
 values standard cron has no notion of: `L` (last day of month), `L-n` (n days
@@ -91,8 +99,9 @@ are accepted on input (`MON`, `JAN`, ...) but always normalized to numbers
 on output, since the two formats number weekdays differently and there's no
 lossless way to round-trip the name through that shift. Quartz's `L`, `W`,
 and `#` day-of-month/day-of-week special values are accepted on
-`to-standard` input (see above); it does not yet handle the
-`@daily`/`@hourly`-style shorthand some cron implementations support.
+`to-standard` input (see above). Standard cron's `@`-shorthands are accepted
+on `to-quartz` input (see above); Quartz has no equivalent shorthand of its
+own, so `to-standard` never produces them.
 
 ## License
 

@@ -57,7 +57,43 @@ class QuartzCron:
     year: Optional[List[Term]]  # None means the field was omitted
 
 
+# Shorthand replacements, per the crontab(5) convention. @reboot has no fixed
+# schedule at all, so it's rejected below rather than mapped to fields.
+_SHORTHANDS = {
+    "@yearly": "0 0 1 1 *",
+    "@annually": "0 0 1 1 *",
+    "@monthly": "0 0 1 * *",
+    "@weekly": "0 0 * * 0",
+    "@daily": "0 0 * * *",
+    "@midnight": "0 0 * * *",
+    "@hourly": "0 * * * *",
+}
+
+
+def _expand_shorthand(expr: str) -> str:
+    tokens = expr.split()
+    if len(tokens) != 1:
+        raise CronFormatError(
+            f"'{expr}': a shorthand like '{tokens[0]}' must be the entire expression, "
+            "not combined with other fields"
+        )
+    name = tokens[0]
+    if name == "@reboot":
+        raise CronFormatError("'@reboot' has no fixed schedule and cannot be converted")
+    mapped = _SHORTHANDS.get(name)
+    if mapped is None:
+        raise CronFormatError(
+            f"'{name}' is not a recognized shorthand "
+            f"(expected one of {sorted(_SHORTHANDS)} or @reboot)"
+        )
+    return mapped
+
+
 def parse_standard(expr: str, lenient: bool = False) -> StandardCron:
+    expr = expr.strip()
+    if expr.startswith("@"):
+        expr = _expand_shorthand(expr)
+
     fields = expr.split()
     if len(fields) != 5:
         raise CronFormatError(

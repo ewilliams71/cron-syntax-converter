@@ -24,6 +24,33 @@ class ParseStandardTests(unittest.TestCase):
         standard = parse_standard("0 0 * * 7", lenient=True)
         self.assertEqual(standard.dow[0].start, 0)
 
+    def test_shorthand_daily(self):
+        standard = parse_standard("@daily")
+        self.assertEqual(to_quartz(standard), "0 0 0 * * ?")
+
+    def test_shorthand_hourly(self):
+        standard = parse_standard("@hourly")
+        self.assertEqual(to_quartz(standard), "0 0 * * * ?")
+
+    def test_shorthand_weekly(self):
+        standard = parse_standard("@weekly")
+        self.assertEqual(to_quartz(standard), "0 0 0 ? * 1")
+
+    def test_shorthand_midnight_same_as_daily(self):
+        self.assertEqual(parse_standard("@midnight"), parse_standard("@daily"))
+
+    def test_shorthand_unrecognized_raises(self):
+        with self.assertRaises(CronFormatError):
+            parse_standard("@fortnightly")
+
+    def test_shorthand_reboot_raises(self):
+        with self.assertRaises(CronFormatError):
+            parse_standard("@reboot")
+
+    def test_shorthand_combined_with_other_fields_raises(self):
+        with self.assertRaises(CronFormatError):
+            parse_standard("@daily extra")
+
 
 class ParseQuartzTests(unittest.TestCase):
     def test_wrong_field_count_raises(self):
